@@ -129,7 +129,7 @@ python src/cli/main.py test-packet
 État d'avancement des sprints
 
 Sprint 0: Bootstrap & Architecture (Terminé)
-Sprint 1: Couche Réseau P2P (En cours)
+Sprint 1: Couche Réseau P2P (Terminé)
 Sprint 2: Chiffrement E2E  (À faire)
 Sprint 3: Chunking & Transfert (À faire)
 Sprint 4: Intégration & Polish (À faire)
