@@ -205,15 +205,15 @@ Vous : Bonjour depuis Archipel !
 
 ---
 
-## 📊 État d'avancement des sprints
+État d'avancement des sprints
 
 | Sprint | Titre | Statut | Livrable validé |
 |--------|-------|--------|----------------|
 | Sprint 0 | Bootstrap & Architecture |  Terminé | PKI Ed25519, format paquets, README |
-| Sprint 1 | Couche Réseau P2P | ✅ Terminé | Découverte UDP multicast, Peer Table, scan LAN |
-| Sprint 2 | Chiffrement E2E | ✅ Terminé | AES-256-GCM, chat bidirectionnel multi-PC |
-| Sprint 3 | Chunking & Transfert | 🔄 En cours | Transfert fichier 50 Mo, vérification SHA-256 |
-| Sprint 4 | Intégration & Polish | ⏳ À faire | CLI final, Gemini AI, démo jury |
+| Sprint 1 | Couche Réseau P2P |  Terminé | Découverte UDP multicast, Peer Table, scan LAN |
+| Sprint 2 | Chiffrement E2E | Terminé | AES-256-GCM, chat bidirectionnel multi-PC |
+| Sprint 3 | Chunking & Transfert | Terminé | Transfert fichier 50 Mo, vérification SHA-256 |
+| Sprint 4 | Intégration & Polish | Encours | CLI final, Gemini AI, démo jury |
 
 ---
 
