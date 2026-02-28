@@ -63,9 +63,65 @@ def get_all_local_ips():
 
 
 def get_my_ip():
-    """Retourne la premiere IP locale non-loopback trouvee."""
-    ips = get_all_local_ips()
-    return ips[0] if ips else "127.0.0.1"
+    """
+    Retourne l'IP locale réelle (celle qui permet de communiquer sur le réseau local)
+    """
+    try:
+        # Méthode 1: Se connecter à une IP publique (sans vraiment se connecter)
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.1)
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+        s.close()
+        
+        # Vérifie que c'est une IP locale valide
+        if ip and not ip.startswith('127.'):
+            print(f"[DEBUG] IP via connexion UDP: {ip}")
+            return ip
+    except Exception as e:
+        print(f"[DEBUG] Méthode UDP a échoué: {e}")
+        pass
+    
+    try:
+        # Méthode 2: Lister toutes les interfaces réseau
+        hostname = socket.gethostname()
+        all_ips = socket.gethostbyname_ex(hostname)[2]
+        print(f"[DEBUG] Toutes les IPs via gethostbyname_ex: {all_ips}")
+        
+        # Priorité 1: IP qui commence par 10. (comme la tienne)
+        for ip in all_ips:
+            if ip.startswith('10.'):
+                print(f"[DEBUG] IP 10.x.x.x trouvée: {ip}")
+                return ip
+        
+        # Priorité 2: IP qui commence par 192.168.
+        for ip in all_ips:
+            if ip.startswith('192.168.'):
+                print(f"[DEBUG] IP 192.168.x.x trouvée: {ip}")
+                return ip
+        
+        # Priorité 3: IP qui commence par 172.
+        for ip in all_ips:
+            if ip.startswith('172.'):
+                print(f"[DEBUG] IP 172.x.x.x trouvée: {ip}")
+                return ip
+        
+        # Sinon la première IP non-loopback
+        for ip in all_ips:
+            if ip and not ip.startswith('127.'):
+                print(f"[DEBUG] Autre IP trouvée: {ip}")
+                return ip
+    except Exception as e:
+        print(f"[DEBUG] Méthode gethostbyname_ex a échoué: {e}")
+        pass
+    
+    # Méthode 3: Fallback
+    try:
+        ip = socket.gethostbyname(socket.gethostname())
+        print(f"[DEBUG] Fallback IP: {ip}")
+        return ip
+    except:
+        return '127.0.0.1'
 
 
 def scan_network(port=7777, timeout=0.4):

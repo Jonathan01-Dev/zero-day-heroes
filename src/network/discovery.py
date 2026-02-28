@@ -95,17 +95,36 @@ class DiscoveryService:
         self.running    = False
 
     def start(self):
+        """Démarre les threads de découverte"""
         self.running = True
-        threading.Thread(target=self._hello_sender,   daemon=True).start()
-        threading.Thread(target=self._hello_listener, daemon=True).start()
-        threading.Thread(target=self._cleanup_loop,   daemon=True).start()
-        print(f"[DÉCOUVERTE] Service démarré sur le réseau")
+        
+        # Obtenir la bonne IP locale
+        from src.network.scanner import get_my_ip
+        my_real_ip = get_my_ip()
+        
+        # Thread d'envoi des HELLO
+        self.broadcast_thread = threading.Thread(target=self._hello_sender, daemon=True)
+        self.broadcast_thread.start()
+        
+        # Thread d'écoute des HELLO
+        self.listen_thread = threading.Thread(target=self._hello_listener, daemon=True)
+        self.listen_thread.start()
+        
+        # Thread de nettoyage - AJOUTE CETTE MÉTHODE
+        self.cleanup_thread = threading.Thread(target=self._cleanup, daemon=True)
+        self.cleanup_thread.start()
+        
+        print(f"[DÉCOUVERTE] Service démarré sur IP {my_real_ip}")
 
     def _hello_sender(self):
         """Envoie HELLO en multicast toutes les 30s."""
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
+
+        from src.network.scanner import get_my_ip
+        local_ip = get_my_ip()
+        print(f"[DEBUG SENDER] Envoi depuis {local_ip} vers {MULTICAST_GROUP}:{MULTICAST_PORT}")
 
         first = True
         while self.running:
@@ -117,6 +136,8 @@ class DiscoveryService:
                 }
                 packet = build_packet(TYPE_HELLO, self.node_id, payload)
                 sock.sendto(packet, (MULTICAST_GROUP, MULTICAST_PORT))
+                
+                print(f"[DEBUG SENDER] Paquet HELLO envoyé à {MULTICAST_GROUP}:{MULTICAST_PORT}")
 
                 if first:
                     print(f"[HELLO] Première annonce envoyée sur le réseau")
@@ -142,16 +163,24 @@ class DiscoveryService:
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
             sock.settimeout(2.0)
 
-            print(f"[DÉCOUVERTE] Écoute sur port {MULTICAST_PORT}...")
+            print(f"[DEBUG LISTENER] Écoute sur 0.0.0.0:{MULTICAST_PORT}")
+            print(f"[DEBUG LISTENER] Groupe multicast: {MULTICAST_GROUP}")
+            
+            from src.network.scanner import get_my_ip
+            print(f"[DEBUG LISTENER] IP locale: {get_my_ip()}")
 
             while self.running:
                 try:
                     data, addr = sock.recvfrom(4096)
+                    print(f"[DEBUG LISTENER] Paquet reçu de {addr[0]}:{addr[1]}")
+                    
                     packet = parse_packet(data)
 
                     if packet is None:
+                        print("[DEBUG LISTENER] Paquet invalide")
                         continue
                     if packet["type"] != TYPE_HELLO:
+                        print(f"[DEBUG LISTENER] Type incorrect: {packet['type']}")
                         continue
 
                     sender_id = packet["payload"]["node_id"]
@@ -162,25 +191,30 @@ class DiscoveryService:
                     my_key   = f"{self.node_id}_{self.tcp_port}"
 
                     if peer_key == my_key:
+                        print("[DEBUG LISTENER] Message de soi-même ignoré")
                         continue
 
+                    print(f"[DEBUG LISTENER] NOUVEAU PAIR: {sender_ip}:{tcp_port}")
                     self.peer_table.upsert(peer_key, sender_ip, tcp_port)
 
                 except socket.timeout:
                     continue
-                except Exception:
+                except Exception as e:
+                    print(f"[DEBUG LISTENER] Erreur: {e}")
                     continue
 
         except Exception as e:
             print(f"[ERREUR FATALE] Listener : {e}")
 
-    def _cleanup_loop(self):
+    def _cleanup(self):  # Renommé de _cleanup_loop à _cleanup
         """Nettoie les pairs morts toutes les 30s."""
         while self.running:
             time.sleep(30)
             self.peer_table.remove_dead_peers()
+            print("[DEBUG CLEANUP] Nettoyage des pairs morts effectué")
 
     def stop(self):
+        """Arrête le service de découverte"""
         self.running = False
         print("[DÉCOUVERTE] Service arrêté")
 
