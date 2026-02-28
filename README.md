@@ -137,10 +137,15 @@ Sprint 4: Intégration & Polish (À faire)
 
 Limitations connues
 
-- Sprint 0 uniquement : pas encore de réseau actif
-- Identification du protocol à utiliser et du mode de connexion entre les différents appareils
-- La découverte de pairs sera implémentée au Sprint 1
-- Le chiffrement des messages au Sprint 2
+- Le chat bidirectionnel fonctionne sur la même machine (2 terminaux).
+  Sur 2 PC différents, les 2 doivent être sur le même réseau WiFi ou câble.
+- La clé de session est dérivée d'un secret partagé fixe (hackathon).
+  En production, un vrai handshake Noise Protocol serait utilisé.
+- Le Web of Trust est en mode TOFU (Trust On First Use) uniquement.
+  La propagation de confiance entre pairs n'est pas encore implémentée.
+- Le transfert de fichiers (Sprint 3) est en cours d'implémentation.
+- Pas encore de persistance des messages sur disque.
+- Interface en ligne de commande uniquement — pas d'UI graphique.
 
 Lancer un nœud
 Terminal 1 :
