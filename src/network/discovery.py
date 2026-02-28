@@ -12,7 +12,7 @@ from src.crypto.packet import build_packet, parse_packet, TYPE_HELLO
 
 MULTICAST_GROUP = '239.255.42.99'
 MULTICAST_PORT  = 6000
-HELLO_INTERVAL  = 10
+HELLO_INTERVAL  = 30   # ← 30s au lieu de 10s pour moins de spam
 PEER_TIMEOUT    = 90
 
 class PeerTable:
@@ -29,9 +29,8 @@ class PeerTable:
                 "last_seen": time.time()
             }
             if is_new:
-                print(f"\n[CONNECTE A UN NOUVEAU PAIR] {node_id[:16]}... @ {ip}:{port}")
-            else:
-                print(f"[PAIR] Mis à jour : {node_id[:16]}... @ {ip}:{port}")
+                print(f"\n[🟢 NOUVEAU PAIR] {node_id[:16]}... @ {ip}:{port}")
+            # ← supprimé le print "archipel>" qui cassait l'interface
 
     def remove_dead_peers(self):
         with self.lock:
@@ -41,7 +40,7 @@ class PeerTable:
                 if now - info["last_seen"] > PEER_TIMEOUT
             ]
             for nid in dead:
-                print(f"[PAIR MORT] {nid[:16]}...")
+                print(f"[❌ PAIR MORT] {nid[:16]}...")
                 del self.peers[nid]
 
     def get_all(self):
@@ -73,20 +72,18 @@ class DiscoveryService:
 
     def start(self):
         self.running = True
-
         threading.Thread(target=self._hello_sender,   daemon=True).start()
         threading.Thread(target=self._hello_listener, daemon=True).start()
         threading.Thread(target=self._cleanup_loop,   daemon=True).start()
-
         print(f"[DÉCOUVERTE] Service démarré")
 
     def _hello_sender(self):
-        """Envoie HELLO en multicast"""
+        """Envoie HELLO en multicast toutes les 30s — silencieux"""
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
-        # Important sur Windows : bind sur l'interface locale
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
 
+        first = True
         while self.running:
             try:
                 payload = {
@@ -96,7 +93,12 @@ class DiscoveryService:
                 }
                 packet = build_packet(TYPE_HELLO, self.node_id, payload)
                 sock.sendto(packet, (MULTICAST_GROUP, MULTICAST_PORT))
-                print(f"[HELLO] Annonce envoyée (port {self.tcp_port})")
+
+                if first:
+                    print(f"[HELLO] Première annonce envoyée sur le réseau")
+                    first = False
+                # ← plus de print à chaque HELLO pour ne pas spammer
+
                 time.sleep(HELLO_INTERVAL)
             except Exception as e:
                 print(f"[ERREUR] Envoi HELLO : {e}")
@@ -107,11 +109,8 @@ class DiscoveryService:
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
-            # Sur Windows il faut bind sur '' pas sur l'adresse multicast
             sock.bind(('', MULTICAST_PORT))
 
-            # Rejoindre le groupe multicast
             mreq = struct.pack("4sL",
                 socket.inet_aton(MULTICAST_GROUP),
                 socket.INADDR_ANY
@@ -136,8 +135,7 @@ class DiscoveryService:
                     tcp_port  = packet["payload"]["tcp_port"]
                     sender_ip = addr[0]
 
-                    # Sur la même machine : différencier par le port TCP
-                    # pas par le node_id (qui est identique)
+                    # Différencier les nœuds par node_id + port
                     peer_key = f"{sender_id}_{tcp_port}"
                     my_key   = f"{self.node_id}_{self.tcp_port}"
 
@@ -149,7 +147,8 @@ class DiscoveryService:
                 except socket.timeout:
                     continue
                 except Exception as e:
-                    print(f"[ERREUR] Réception : {e}")
+                    if "mauvais magic bytes" not in str(e):
+                        print(f"[ERREUR] Réception : {e}")
 
         except Exception as e:
             print(f"[ERREUR FATALE] Listener : {e}")
@@ -161,3 +160,4 @@ class DiscoveryService:
 
     def stop(self):
         self.running = False
+        print("[DÉCOUVERTE] Service arrêté")
