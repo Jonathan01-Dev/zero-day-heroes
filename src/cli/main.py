@@ -8,18 +8,19 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from src.crypto.identity   import load_identity
 from src.crypto.messaging  import MessagingService
 from src.crypto.handshake  import SessionManager
-from src.network.discovery import DiscoveryService, PeerTable
+from src.network.discovery import DiscoveryService, PeerTable, add_peer_manually
 
-peer_table = PeerTable()
-messaging  = None
+peer_table    = PeerTable()
+messaging     = None
+file_transfer = None
 
 def input_thread(peer_list_ref):
     """Thread séparé pour lire les messages à envoyer"""
     global messaging
 
     # Attendre que les pairs soient découverts
-    print("[INFO] En attente de pairs... (max 20 secondes)")
-    for _ in range(20):
+    print("[INFO] En attente de pairs... (max 30 secondes)")
+    for _ in range(30):
         time.sleep(1)
         peers = peer_table.get_all()
         if peers:
@@ -27,11 +28,12 @@ def input_thread(peer_list_ref):
 
     peers = peer_table.get_all()
     if not peers:
-        print("[ERREUR] Aucun pair trouvé après 20s")
-        print("[INFO] Relancez les 2 terminaux en même temps")
+        print("\n[⚠️] Aucun pair trouvé automatiquement.")
+        print("[INFO] Utilisez la connexion manuelle :")
+        print("       python src/cli/main.py node 7777 <IP_DU_PAIR>")
         return
 
-    # Affiche les pairs disponibles
+    # Affiche les pairs
     print(f"\n{len(peers)} pair(s) trouvé(s) :")
     peer_list = list(peers.items())
     for i, (nid, info) in enumerate(peer_list):
@@ -44,7 +46,6 @@ def input_thread(peer_list_ref):
         peer_id, peer_info = peer_list[index]
         peer_ip   = peer_info["ip"]
         peer_port = peer_info["port"]
-        # Stocker dans la ref partagée
         peer_list_ref["id"]   = peer_id
         peer_list_ref["ip"]   = peer_ip
         peer_list_ref["port"] = peer_port
@@ -58,7 +59,7 @@ def input_thread(peer_list_ref):
     print("  Tapez 'quit' pour quitter")
     print("─" * 50 + "\n")
 
-    # Boucle d'envoi
+    # Boucle chat
     while True:
         try:
             texte = input("Vous : ").strip()
@@ -80,10 +81,10 @@ def input_thread(peer_list_ref):
         )
 
 
-def cmd_node(port=7777):
+def cmd_node(port=7777, peer_ip=None):
     """
-    Mode nœud complet — envoie ET reçoit des messages.
-    Lancez ce mode sur les 2 terminaux avec des ports différents.
+    Mode nœud complet.
+    Si peer_ip est fourni : connexion directe sans multicast.
     """
     global messaging
 
@@ -104,10 +105,13 @@ def cmd_node(port=7777):
     discovery = DiscoveryService(peer_table, node_id, tcp_port=port)
     discovery.start()
 
-    # Référence partagée pour le pair choisi
-    peer_ref = {}
+    # Si IP fournie → connexion directe immédiate
+    if peer_ip:
+        print(f"[INFO] Connexion directe vers {peer_ip}:{port}")
+        add_peer_manually(peer_table, peer_ip, port)
 
-    # Thread pour l'input utilisateur
+    # Thread pour l'input
+    peer_ref = {}
     t = threading.Thread(
         target=input_thread,
         args=(peer_ref,),
@@ -115,7 +119,7 @@ def cmd_node(port=7777):
     )
     t.start()
 
-    # Boucle principale — garde le programme vivant
+    # Boucle principale
     try:
         while True:
             time.sleep(1)
@@ -129,12 +133,19 @@ def show_help():
 ARCHIPEL — Commandes :
 
   python src/cli/main.py node 7777
-      → Démarrer un nœud complet (envoie ET reçoit)
+      → Nœud automatique (découverte multicast)
+
+  python src/cli/main.py node 7777 192.168.1.10
+      → Connexion directe vers IP (si multicast bloqué)
 
   python src/cli/main.py help
       → Cette aide
 
-WORKFLOW DEMO (2 terminaux) :
+WORKFLOW 2 PC MÊME RÉSEAU :
+  PC1 : python src/cli/main.py node 7777
+  PC2 : python src/cli/main.py node 7777 <IP_DE_PC1>
+
+WORKFLOW MÊME MACHINE :
   Terminal 1 : python src/cli/main.py node 7777
   Terminal 2 : python src/cli/main.py node 8888
     """)
@@ -148,8 +159,9 @@ if __name__ == "__main__":
     command = sys.argv[1]
 
     if command == "node":
-        port = int(sys.argv[2]) if len(sys.argv) > 2 else 7777
-        cmd_node(port)
+        port     = int(sys.argv[2]) if len(sys.argv) > 2 else 7777
+        peer_ip  = sys.argv[3] if len(sys.argv) > 3 else None
+        cmd_node(port, peer_ip)
 
     elif command == "help":
         show_help()

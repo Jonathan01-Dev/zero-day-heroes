@@ -161,3 +161,9 @@ class DiscoveryService:
     def stop(self):
         self.running = False
         print("[DÉCOUVERTE] Service arrêté")
+    
+    def add_peer_manually(peer_table, ip, port):
+        """Ajoute un pair manuellement par IP sans multicast"""
+        node_id = f"manual_{ip}_{port}"
+        peer_table.upsert(node_id, ip, port)
+        print(f"[OK] Pair ajouté manuellement : {ip}:{port}")
