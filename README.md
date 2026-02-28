@@ -130,8 +130,8 @@ python src/cli/main.py test-packet
 
 Sprint 0: Bootstrap & Architecture (Terminé)
 Sprint 1: Couche Réseau P2P (Terminé)
-Sprint 2: Chiffrement E2E  (À faire)
-Sprint 3: Chunking & Transfert (À faire)
+Sprint 2: Chiffrement E2E  (Terminé)
+Sprint 3: Chunking & Transfert (En cours)
 Sprint 4: Intégration & Polish (À faire)
 
 
@@ -141,6 +141,16 @@ Limitations connues
 - Identification du protocol à utiliser et du mode de connexion entre les différents appareils
 - La découverte de pairs sera implémentée au Sprint 1
 - Le chiffrement des messages au Sprint 2
+
+Lancer un nœud
+Terminal 1 :
+python src/cli/main.py node 7777
+
+Terminal 2 :
+python src/cli/main.py node 8888
+
+Les 2 nœuds se découvrent automatiquement.
+Choisissez le pair et envoyez des messages chiffrés.
 
 
 *Hackathon Archipel 2026 — La Piscine LBS par le groupe Zero_Day_Heroes*
